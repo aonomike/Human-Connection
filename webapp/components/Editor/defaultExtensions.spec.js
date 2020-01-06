@@ -63,6 +63,7 @@ describe('defaultExtensions', () => {
     it('recognizes embed code', () => {
       const editor = createEditor()
       const expected = {
+        type: 'doc',
         content: [
           {
             content: [
@@ -85,8 +86,8 @@ describe('defaultExtensions', () => {
             type: 'paragraph',
           },
         ],
-        type: 'doc',
       }
+
       expect(editor.getJSON()).toEqual(expected)
     })
   })

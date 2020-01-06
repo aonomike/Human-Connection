@@ -5,7 +5,12 @@
         <filter-menu :hashtag="hashtag" @clearSearch="clearSearch" />
       </ds-grid-item>
       <ds-grid-item :row-span="2" column-span="fullWidth" class="top-info-bar">
-        <donation-info />
+        <!--<donation-info /> -->
+        <div>
+          <a target="_blank" href="https://human-connection.org/spenden/">
+            <ds-button primary>{{ $t('donations.donate-now') }}</ds-button>
+          </a>
+        </div>
         <div class="sorting-dropdown">
           <ds-select
             v-model="selected"
@@ -16,10 +21,13 @@
         </div>
       </ds-grid-item>
       <template v-if="hasResults">
-        <masonry-grid-item v-for="post in currentPosts" :key="post.id">
+        <masonry-grid-item
+          v-for="post in posts"
+          :key="post.id"
+          :imageAspectRatio="post.imageAspectRatio"
+        >
           <hc-post-card
             :post="post"
-            :width="{ base: '100%', xs: '100%', md: '50%', xl: '33%' }"
             @removePostFromList="deletePost"
             @pinPost="pinPost"
             @unpinPost="unpinPost"
@@ -44,21 +52,16 @@
         primary
       />
     </client-only>
-    <div
-      v-if="hasMore"
-      v-infinite-scroll="showMoreContributions"
-      :infinite-scroll-disabled="$apollo.loading"
-      :infinite-scroll-distance="10"
-      :infinite-scroll-throttle-delay="800"
-      :infinite-scroll-immediate-check="true"
-    >
-      <hc-load-more :loading="$apollo.loading" @click="showMoreContributions" />
-    </div>
+    <client-only>
+      <infinite-loading v-if="hasMore" @infinite="showMoreContributions">
+        <hc-load-more :loading="$apollo.loading" @click="showMoreContributions" />
+      </infinite-loading>
+    </client-only>
   </div>
 </template>
 
 <script>
-import DonationInfo from '~/components/DonationInfo/DonationInfo.vue'
+// import DonationInfo from '~/components/DonationInfo/DonationInfo.vue'
 import FilterMenu from '~/components/FilterMenu/FilterMenu.vue'
 import HcEmpty from '~/components/Empty/Empty'
 import HcPostCard from '~/components/PostCard/PostCard.vue'
@@ -68,10 +71,11 @@ import MasonryGridItem from '~/components/MasonryGrid/MasonryGridItem.vue'
 import { mapGetters, mapMutations } from 'vuex'
 import { filterPosts } from '~/graphql/PostQuery.js'
 import PostMutations from '~/graphql/PostMutations'
+import UpdateQuery from '~/components/utils/UpdateQuery'
 
 export default {
   components: {
-    DonationInfo,
+    // DonationInfo,
     FilterMenu,
     HcPostCard,
     HcLoadMore,
@@ -97,7 +101,6 @@ export default {
       orderBy: 'posts/orderBy',
       selectedOrder: 'posts/selectedOrder',
       sortingIcon: 'posts/orderIcon',
-      currentPosts: 'posts/currentPosts',
     }),
     selected: {
       get() {
@@ -105,7 +108,7 @@ export default {
       },
       set({ value }) {
         this.offset = 0
-        this.setCurrentPosts([])
+        this.posts = []
         this.selectOrder(value)
       },
     },
@@ -123,13 +126,12 @@ export default {
       return filter
     },
     hasResults() {
-      return this.$apollo.loading || (this.currentPosts && this.currentPosts.length > 0)
+      return this.$apollo.loading || (this.posts && this.posts.length > 0)
     },
   },
   methods: {
     ...mapMutations({
       selectOrder: 'posts/SELECT_ORDER',
-      setCurrentPosts: 'posts/SET_CURRENT_POSTS',
     }),
     clearSearch() {
       this.$router.push({ path: '/' })
@@ -141,7 +143,7 @@ export default {
         params: { id: post.id, slug: post.slug },
       }).href
     },
-    showMoreContributions() {
+    showMoreContributions($state) {
       const { Post: PostQuery } = this.$apollo.queries
       if (!PostQuery) return // seems this can be undefined on subpages
 
@@ -153,34 +155,17 @@ export default {
           first: this.pageSize,
           orderBy: ['pinned_asc', this.orderBy],
         },
-        updateQuery: (previousResult, { fetchMoreResult }) => {
-          if (!fetchMoreResult || fetchMoreResult.Post.length < this.pageSize) {
-            this.hasMore = false
-          }
-          const result = {
-            ...previousResult,
-            Post: [
-              ...previousResult.Post.filter(prevPost => {
-                return (
-                  fetchMoreResult.Post.filter(newPost => newPost.id === prevPost.id).length === 0
-                )
-              }),
-              ...fetchMoreResult.Post,
-            ],
-          }
-          this.setCurrentPosts(result.Post)
-        },
+        updateQuery: UpdateQuery(this, { $state, pageKey: 'Post' }),
       })
     },
     deletePost(deletedPost) {
-      const posts = this.currentPosts.filter(post => {
+      this.posts = this.posts.filter(post => {
         return post.id !== deletedPost.id
       })
-      this.setCurrentPosts(posts)
     },
     resetPostList() {
       this.offset = 0
-      this.setCurrentPosts([])
+      this.posts = []
       this.hasMore = true
     },
     pinPost(post) {
@@ -224,7 +209,7 @@ export default {
         }
       },
       update({ Post }) {
-        this.setCurrentPosts(Post)
+        this.posts = Post
       },
       fetchPolicy: 'cache-and-network',
     },

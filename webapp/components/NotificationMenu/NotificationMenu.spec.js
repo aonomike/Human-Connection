@@ -1,16 +1,11 @@
-import { config, shallowMount, createLocalVue } from '@vue/test-utils'
+import { config, shallowMount } from '@vue/test-utils'
 import NotificationMenu from './NotificationMenu'
 
-import Styleguide from '@human-connection/styleguide'
-import Filters from '~/plugins/vue-filters'
+const localVue = global.localVue
 
-const localVue = createLocalVue()
-
-localVue.use(Styleguide)
-localVue.use(Filters)
 localVue.filter('truncate', string => string)
 
-config.stubs['dropdown'] = '<span class="dropdown"><slot /></span>'
+config.stubs.dropdown = '<span class="dropdown"><slot /></span>'
 
 describe('NotificationMenu.vue', () => {
   let wrapper

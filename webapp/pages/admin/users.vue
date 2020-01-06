@@ -20,9 +20,7 @@
     </ds-space>
     <ds-card v-if="User && User.length">
       <ds-table :data="User" :fields="fields" condensed>
-        <template slot="index" slot-scope="scope">
-          {{ scope.row.index + 1 }}.
-        </template>
+        <template slot="index" slot-scope="scope">{{ scope.row.index + 1 }}.</template>
         <template slot="name" slot-scope="scope">
           <nuxt-link
             :to="{
@@ -69,7 +67,8 @@
 
 <script>
 import gql from 'graphql-tag'
-import { isEmail, normalizeEmail } from 'validator'
+import { isEmail } from 'validator'
+import normalizeEmail from '~/components/utils/NormalizeEmail'
 
 export default {
   data() {

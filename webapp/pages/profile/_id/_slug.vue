@@ -34,7 +34,7 @@
               {{ userSlug }}
             </ds-text>
             <ds-text v-if="user.location" align="center" color="soft" size="small">
-              <ds-icon name="map-marker" />
+              <base-icon name="map-marker" />
               {{ user.location.name }}
             </ds-text>
             <ds-text align="center" color="soft" size="small">
@@ -168,7 +168,7 @@
       </ds-flex-item>
 
       <ds-flex-item :width="{ base: '100%', sm: 3, md: 5, lg: 3 }">
-        <masonry-grid class="user-profile-posts-list">
+        <masonry-grid>
           <ds-grid-item class="profile-top-navigation" :row-span="3" column-span="fullWidth">
             <ds-card class="ds-tab-nav">
               <ul class="Tabs">
@@ -197,7 +197,7 @@
                 <li
                   class="Tabs__tab pointer"
                   :class="{ active: tabActive === 'shout' }"
-                  v-if="myProfile"
+                  v-if="myProfile || user.showShoutsPublicly"
                 >
                   <a @click="handleTab('shout')">
                     <ds-space margin="small">
@@ -232,7 +232,11 @@
           </ds-grid-item>
 
           <template v-if="posts.length">
-            <masonry-grid-item v-for="post in posts" :key="post.id">
+            <masonry-grid-item
+              v-for="post in posts"
+              :key="post.id"
+              :imageAspectRatio="post.imageAspectRatio"
+            >
               <hc-post-card
                 :post="post"
                 :width="{ base: '100%', md: '100%', xl: '50%' }"
@@ -255,16 +259,11 @@
             </ds-grid-item>
           </template>
         </masonry-grid>
-        <div
-          v-if="hasMore && posts.length >= pageSize"
-          v-infinite-scroll="showMoreContributions"
-          :infinite-scroll-disabled="$apollo.loading"
-          :infinite-scroll-distance="10"
-          :infinite-scroll-throttle-delay="800"
-          :infinite-scroll-immediate-check="true"
-        >
-          <hc-load-more :loading="$apollo.loading" @click="showMoreContributions" />
-        </div>
+        <client-only>
+          <infinite-loading v-if="hasMore" @infinite="showMoreContributions">
+            <hc-load-more :loading="$apollo.loading" @click="showMoreContributions" />
+          </infinite-loading>
+        </client-only>
       </ds-flex-item>
     </ds-flex>
   </div>
@@ -279,7 +278,7 @@ import HcCountTo from '~/components/CountTo.vue'
 import HcBadges from '~/components/Badges.vue'
 import HcLoadMore from '~/components/LoadMore.vue'
 import HcEmpty from '~/components/Empty/Empty'
-import ContentMenu from '~/components/ContentMenu'
+import ContentMenu from '~/components/ContentMenu/ContentMenu'
 import HcUpload from '~/components/Upload'
 import HcAvatar from '~/components/Avatar/Avatar.vue'
 import MasonryGrid from '~/components/MasonryGrid/MasonryGrid.vue'
@@ -288,6 +287,7 @@ import { profilePagePosts } from '~/graphql/PostQuery'
 import UserQuery from '~/graphql/User'
 import { Block, Unblock } from '~/graphql/settings/BlockedUsers'
 import PostMutations from '~/graphql/PostMutations'
+import UpdateQuery from '~/components/utils/UpdateQuery'
 
 const tabToFilterMapping = ({ tab, id }) => {
   return {
@@ -378,7 +378,7 @@ export default {
     uniq(items, field = 'id') {
       return uniqBy(items, field)
     },
-    showMoreContributions() {
+    showMoreContributions($state) {
       const { profilePagePosts: PostQuery } = this.$apollo.queries
       if (!PostQuery) return // seems this can be undefined on subpages
       this.offset += this.pageSize
@@ -390,24 +390,7 @@ export default {
           first: this.pageSize,
           orderBy: 'createdAt_desc',
         },
-        updateQuery: (previousResult, { fetchMoreResult }) => {
-          if (!fetchMoreResult || fetchMoreResult.profilePagePosts.length < this.pageSize) {
-            this.hasMore = false
-          }
-          const result = {
-            ...previousResult,
-            profilePagePosts: [
-              ...previousResult.profilePagePosts.filter(prevPost => {
-                return (
-                  fetchMoreResult.profilePagePosts.filter(newPost => newPost.id === prevPost.id)
-                    .length === 0
-                )
-              }),
-              ...fetchMoreResult.profilePagePosts,
-            ],
-          }
-          return result
-        },
+        updateQuery: UpdateQuery(this, { $state, pageKey: 'profilePagePosts' }),
       })
     },
     resetPostList() {

@@ -100,13 +100,14 @@ export default {
    ** Global processed styles
    */
   styleResources: {
-    scss: [styleguideStyles, '~view/styles/tokens.scss'],
+    scss: [styleguideStyles, '~assets/_new/styles/tokens.scss'],
   },
 
   /*
    ** Plugins to load before mounting the App
    */
   plugins: [
+    { src: '~/plugins/base-components.js', ssr: true },
     {
       src: `~/plugins/styleguide${process.env.STYLEGUIDE_DEV ? '-dev' : ''}.js`,
       ssr: true,
@@ -118,7 +119,7 @@ export default {
     { src: '~/plugins/v-tooltip.js', ssr: false },
     { src: '~/plugins/izi-toast.js', ssr: false },
     { src: '~/plugins/vue-filters.js' },
-    { src: '~/plugins/vue-infinite-scroll.js', ssr: false },
+    { src: '~/plugins/vue-infinite-loading.js', ssr: false },
   ],
 
   router: {
@@ -257,20 +258,45 @@ export default {
       svgRule.test = /\.(png|jpe?g|gif|webp)$/
       config.module.rules.push({
         test: /\.svg$/,
-        loader: 'vue-svg-loader',
-        options: {
-          svgo: {
-            plugins: [
-              {
-                removeViewBox: false,
+        use: [
+          'babel-loader',
+          {
+            loader: 'vue-svg-loader',
+            options: {
+              svgo: {
+                plugins: [
+                  {
+                    removeViewBox: false,
+                  },
+                  {
+                    removeDimensions: true,
+                  },
+                ],
               },
-              {
-                removeDimensions: true,
-              },
-            ],
+            },
           },
-        },
+        ],
       })
+      const tagAttributesForTesting = ['data-test', ':data-test', 'v-bind:data-test']
+      ctx.loaders.vue.compilerOptions = {
+        modules: [
+          {
+            preTransformNode(abstractSyntaxTreeElement) {
+              if (!ctx.isDev) {
+                const { attrsMap, attrsList } = abstractSyntaxTreeElement
+                tagAttributesForTesting.forEach(attribute => {
+                  if (attrsMap[attribute]) {
+                    delete attrsMap[attribute]
+                    const index = attrsList.findIndex(attr => attr.name === attribute)
+                    attrsList.splice(index, 1)
+                  }
+                })
+              }
+              return abstractSyntaxTreeElement
+            },
+          },
+        ],
+      }
     },
   },
 }
