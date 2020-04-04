@@ -1,11 +1,11 @@
 import { gql } from '../../helpers/jest'
-import Factory from '../../factories'
+import { cleanDatabase } from '../../db/factories'
 import { createTestClient } from 'apollo-server-testing'
 import { getNeode, getDriver } from '../../db/neo4j'
-import createServer from '../../server'
+import createServer, { pubsub } from '../../server'
 
 let server, query, mutate, notifiedUser, authenticatedUser
-const factory = Factory()
+let publishSpy
 const driver = getDriver()
 const neode = getNeode()
 const categoryIds = ['cat9']
@@ -36,7 +36,8 @@ const createCommentMutation = gql`
 `
 
 beforeAll(async () => {
-  await factory.cleanDatabase()
+  await cleanDatabase()
+  publishSpy = jest.spyOn(pubsub, 'publish')
   const createServerResult = createServer({
     context: () => {
       return {
@@ -53,13 +54,19 @@ beforeAll(async () => {
 })
 
 beforeEach(async () => {
-  notifiedUser = await neode.create('User', {
-    id: 'you',
-    name: 'Al Capone',
-    slug: 'al-capone',
-    email: 'test@example.org',
-    password: '1234',
-  })
+  publishSpy.mockClear()
+  notifiedUser = await neode.create(
+    'User',
+    {
+      id: 'you',
+      name: 'Al Capone',
+      slug: 'al-capone',
+    },
+    {
+      email: 'test@example.org',
+      password: '1234',
+    },
+  )
   await neode.create('Category', {
     id: 'cat9',
     name: 'Democracy & Politics',
@@ -68,7 +75,7 @@ beforeEach(async () => {
 })
 
 afterEach(async () => {
-  await factory.cleanDatabase()
+  await cleanDatabase()
 })
 
 describe('notifications', () => {
@@ -143,13 +150,18 @@ describe('notifications', () => {
         describe('commenter is not me', () => {
           beforeEach(async () => {
             commentContent = 'Commenters comment.'
-            commentAuthor = await neode.create('User', {
-              id: 'commentAuthor',
-              name: 'Mrs Comment',
-              slug: 'mrs-comment',
-              email: 'commentauthor@example.org',
-              password: '1234',
-            })
+            commentAuthor = await neode.create(
+              'User',
+              {
+                id: 'commentAuthor',
+                name: 'Mrs Comment',
+                slug: 'mrs-comment',
+              },
+              {
+                email: 'commentauthor@example.org',
+                password: '1234',
+              },
+            )
           })
 
           it('sends me a notification', async () => {
@@ -224,13 +236,18 @@ describe('notifications', () => {
       })
 
       beforeEach(async () => {
-        postAuthor = await neode.create('User', {
-          id: 'postAuthor',
-          name: 'Mrs Post',
-          slug: 'mrs-post',
-          email: 'post-author@example.org',
-          password: '1234',
-        })
+        postAuthor = await neode.create(
+          'User',
+          {
+            id: 'postAuthor',
+            name: 'Mrs Post',
+            slug: 'mrs-post',
+          },
+          {
+            email: 'post-author@example.org',
+            password: '1234',
+          },
+        )
       })
 
       describe('mentions me in a post', () => {
@@ -245,7 +262,15 @@ describe('notifications', () => {
           await createPostAction()
           const expectedContent =
             'Hey <a class="mention" data-mention-id="you" href="/profile/you/al-capone" target="_blank">@al-capone</a> how do you do?'
-          const expected = expect.objectContaining({
+          await expect(
+            query({
+              query: notificationQuery,
+              variables: {
+                read: false,
+              },
+            }),
+          ).resolves.toMatchObject({
+            errors: undefined,
             data: {
               notifications: [
                 {
@@ -261,15 +286,22 @@ describe('notifications', () => {
               ],
             },
           })
+        })
 
-          await expect(
-            query({
-              query: notificationQuery,
-              variables: {
-                read: false,
-              },
+        it('publishes `NOTIFICATION_ADDED` to me', async () => {
+          await createPostAction()
+          expect(publishSpy).toHaveBeenCalledWith(
+            'NOTIFICATION_ADDED',
+            expect.objectContaining({
+              notificationAdded: expect.objectContaining({
+                reason: 'mentioned_in_post',
+                to: expect.objectContaining({
+                  id: 'you',
+                }),
+              }),
             }),
-          ).resolves.toEqual(expected)
+          )
+          expect(publishSpy).toHaveBeenCalledTimes(1)
         })
 
         describe('updates the post and mentions me again', () => {
@@ -415,6 +447,11 @@ describe('notifications', () => {
               }),
             ).resolves.toEqual(expected)
           })
+
+          it('does not publish `NOTIFICATION_ADDED`', async () => {
+            await createPostAction()
+            expect(publishSpy).not.toHaveBeenCalled()
+          })
         })
       })
 
@@ -428,23 +465,33 @@ describe('notifications', () => {
           beforeEach(async () => {
             commentContent =
               'One mention about me with <a data-mention-id="you" class="mention" href="/profile/you" target="_blank">@al-capone</a>.'
-            commentAuthor = await neode.create('User', {
-              id: 'commentAuthor',
-              name: 'Mrs Comment',
-              slug: 'mrs-comment',
-              email: 'comment-author@example.org',
-              password: '1234',
-            })
+            commentAuthor = await neode.create(
+              'User',
+              {
+                id: 'commentAuthor',
+                name: 'Mrs Comment',
+                slug: 'mrs-comment',
+              },
+              {
+                email: 'comment-author@example.org',
+                password: '1234',
+              },
+            )
           })
 
           it('sends only one notification with reason mentioned_in_comment', async () => {
-            postAuthor = await neode.create('User', {
-              id: 'MrPostAuthor',
-              name: 'Mr Author',
-              slug: 'mr-author',
-              email: 'post-author@example.org',
-              password: '1234',
-            })
+            postAuthor = await neode.create(
+              'User',
+              {
+                id: 'MrPostAuthor',
+                name: 'Mr Author',
+                slug: 'mr-author',
+              },
+              {
+                email: 'post-author@example.org',
+                password: '1234',
+              },
+            )
 
             await createCommentOnPostAction()
             const expected = expect.objectContaining({
@@ -481,7 +528,7 @@ describe('notifications', () => {
           })
           it('sends only one notification with reason commented_on_post, no notification with reason mentioned_in_comment', async () => {
             await createCommentOnPostAction()
-            const expected = expect.objectContaining({
+            const expected = {
               data: {
                 notifications: [
                   {
@@ -496,7 +543,7 @@ describe('notifications', () => {
                   },
                 ],
               },
-            })
+            }
 
             await expect(
               query({
@@ -505,7 +552,7 @@ describe('notifications', () => {
                   read: false,
                 },
               }),
-            ).resolves.toEqual(expected)
+            ).resolves.toMatchObject(expected, { errors: undefined })
           })
         })
 
@@ -514,21 +561,22 @@ describe('notifications', () => {
             await postAuthor.relateTo(notifiedUser, 'blocked')
             commentContent =
               'One mention about me with <a data-mention-id="you" class="mention" href="/profile/you" target="_blank">@al-capone</a>.'
-            commentAuthor = await neode.create('User', {
-              id: 'commentAuthor',
-              name: 'Mrs Comment',
-              slug: 'mrs-comment',
-              email: 'comment-author@example.org',
-              password: '1234',
-            })
+            commentAuthor = await neode.create(
+              'User',
+              {
+                id: 'commentAuthor',
+                name: 'Mrs Comment',
+                slug: 'mrs-comment',
+              },
+              {
+                email: 'comment-author@example.org',
+                password: '1234',
+              },
+            )
           })
 
           it('sends no notification', async () => {
             await createCommentOnPostAction()
-            const expected = expect.objectContaining({
-              data: { notifications: [] },
-            })
-
             await expect(
               query({
                 query: notificationQuery,
@@ -536,7 +584,26 @@ describe('notifications', () => {
                   read: false,
                 },
               }),
-            ).resolves.toEqual(expected)
+            ).resolves.toMatchObject({
+              data: { notifications: [] },
+              errors: undefined,
+            })
+          })
+
+          it('does not publish `NOTIFICATION_ADDED` to authenticated user', async () => {
+            await createCommentOnPostAction()
+            expect(publishSpy).toHaveBeenCalledWith(
+              'NOTIFICATION_ADDED',
+              expect.objectContaining({
+                notificationAdded: expect.objectContaining({
+                  reason: 'commented_on_post',
+                  to: expect.objectContaining({
+                    id: 'postAuthor', // that's expected, it's not me but the post author
+                  }),
+                }),
+              }),
+            )
+            expect(publishSpy).toHaveBeenCalledTimes(1)
           })
         })
       })

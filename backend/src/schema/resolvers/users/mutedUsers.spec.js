@@ -1,11 +1,10 @@
 import { createTestClient } from 'apollo-server-testing'
 import createServer from '../../../server'
-import Factory from '../../../factories'
+import { cleanDatabase } from '../../../db/factories'
 import { gql } from '../../../helpers/jest'
 import { getNeode, getDriver } from '../../../db/neo4j'
 
 const driver = getDriver()
-const factory = Factory()
 const neode = getNeode()
 
 let currentUser
@@ -30,7 +29,7 @@ beforeEach(() => {
 })
 
 afterEach(async () => {
-  await factory.cleanDatabase()
+  await cleanDatabase()
 })
 
 describe('mutedUsers', () => {
@@ -91,7 +90,7 @@ describe('muteUser', () => {
 
   beforeEach(() => {
     currentUser = undefined
-    muteAction = variables => {
+    muteAction = (variables) => {
       const { mutate } = createTestClient(server)
       const muteUserMutation = gql`
         mutation($id: ID!) {
@@ -308,7 +307,7 @@ describe('unmuteUser', () => {
 
   beforeEach(() => {
     currentUser = undefined
-    unmuteAction = variables => {
+    unmuteAction = (variables) => {
       const { mutate } = createTestClient(server)
       const unmuteUserMutation = gql`
         mutation($id: ID!) {

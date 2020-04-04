@@ -6,7 +6,8 @@
     @input-valid="handleInputValid"
     @submit="handleSubmitSocialMedia"
   >
-    <ds-card :header="$t('settings.social-media.name')">
+    <base-card>
+      <h2 class="title">{{ $t('settings.social-media.name') }}</h2>
       <ds-space v-if="socialMediaLinks" margin-top="base" margin="x-small">
         <ds-list>
           <ds-list-item v-for="link in socialMediaLinks" :key="link.id" class="list-item--high">
@@ -62,7 +63,7 @@
           </base-button>
         </ds-space>
       </ds-space>
-    </ds-card>
+    </base-card>
   </ds-form>
 </template>
 
@@ -140,7 +141,7 @@ export default {
           },
           update: (store, { data }) => {
             const socialMedia = this.currentUser.socialMedia.filter(
-              element => element.id !== link.id,
+              (element) => element.id !== link.id,
             )
             this.setCurrentUser({
               ...this.currentUser,
@@ -158,7 +159,7 @@ export default {
       const isEditing = !!this.editingLink.id
       const url = this.formData.socialMediaUrl
 
-      const duplicateUrl = this.socialMediaLinks.find(link => link.url === url)
+      const duplicateUrl = this.socialMediaLinks.find((link) => link.url === url)
       if (duplicateUrl && duplicateUrl.id !== this.editingLink.id) {
         return this.$toast.error(this.$t('settings.social-media.requireUnique'))
       }

@@ -35,14 +35,14 @@ const users = [
 
 storiesOf('Editor', module)
   .addDecorator(withA11y)
-  .addDecorator(storyFn => {
+  .addDecorator((storyFn) => {
     const ctx = storyFn()
     return {
       components: { ctx },
       template: `
-        <ds-card style="width: 50%; min-width: 500px; margin: 0 auto;">
+        <base-card style="width: 50%; min-width: 500px; margin: 0 auto;">
           <ctx />
-        </ds-card>
+        </base-card>
       `,
     }
   })

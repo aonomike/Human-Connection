@@ -1,10 +1,9 @@
-import Factory from '../../factories'
+import Factory, { cleanDatabase } from '../../db/factories'
 import { gql } from '../../helpers/jest'
 import { getNeode, getDriver } from '../../db/neo4j'
 import createServer from '../../server'
 import { createTestClient } from 'apollo-server-testing'
 
-const factory = Factory()
 const neode = getNeode()
 const driver = getDriver()
 
@@ -18,20 +17,32 @@ const action = () => {
 beforeAll(async () => {
   // For performance reasons we do this only once
   const users = await Promise.all([
-    factory.create('User', { id: 'u1', role: 'user' }),
-    factory.create('User', {
-      id: 'm1',
-      role: 'moderator',
-      password: '1234',
-    }),
-    factory.create('User', {
-      id: 'u2',
-      role: 'user',
-      name: 'Offensive Name',
-      slug: 'offensive-name',
-      avatar: '/some/offensive/avatar.jpg',
-      about: 'This self description is very offensive',
-    }),
+    Factory.build('user', { id: 'u1', role: 'user' }),
+    Factory.build(
+      'user',
+      {
+        id: 'm1',
+        role: 'moderator',
+      },
+      {
+        password: '1234',
+      },
+    ),
+    Factory.build(
+      'user',
+      {
+        id: 'u2',
+        role: 'user',
+        name: 'Offensive Name',
+        slug: 'offensive-name',
+        about: 'This self description is very offensive',
+      },
+      {
+        avatar: Factory.build('image', {
+          url: '/some/offensive/avatar.jpg',
+        }),
+      },
+    ),
     neode.create('Category', {
       id: 'cat9',
       name: 'Democracy & Politics',
@@ -45,48 +56,75 @@ beforeAll(async () => {
 
   await Promise.all([
     user.relateTo(troll, 'following'),
-    factory.create('Post', {
-      author: user,
-      id: 'p1',
-      title: 'Deleted post',
-      slug: 'deleted-post',
-      deleted: true,
-      categoryIds,
-    }),
-    factory.create('Post', {
-      author: user,
-      id: 'p3',
-      title: 'Publicly visible post',
-      slug: 'publicly-visible-post',
-      deleted: false,
-      categoryIds,
-    }),
+    Factory.build(
+      'post',
+      {
+        id: 'p1',
+        title: 'Deleted post',
+        slug: 'deleted-post',
+        deleted: true,
+      },
+      {
+        author: user,
+        categoryIds,
+      },
+    ),
+    Factory.build(
+      'post',
+      {
+        id: 'p3',
+        title: 'Publicly visible post',
+        slug: 'publicly-visible-post',
+        deleted: false,
+      },
+      {
+        author: user,
+        categoryIds,
+      },
+    ),
   ])
 
   const resources = await Promise.all([
-    factory.create('Comment', {
-      author: user,
-      id: 'c2',
-      postId: 'p3',
-      content: 'Enabled comment on public post',
-    }),
-    factory.create('Post', {
-      id: 'p2',
-      author: troll,
-      title: 'Disabled post',
-      content: 'This is an offensive post content',
-      contentExcerpt: 'This is an offensive post content',
-      image: '/some/offensive/image.jpg',
-      deleted: false,
-      categoryIds,
-    }),
-    factory.create('Comment', {
-      id: 'c1',
-      author: troll,
-      postId: 'p3',
-      content: 'Disabled comment',
-      contentExcerpt: 'Disabled comment',
-    }),
+    Factory.build(
+      'comment',
+      {
+        id: 'c2',
+        content: 'Enabled comment on public post',
+      },
+      {
+        author: user,
+        postId: 'p3',
+      },
+    ),
+    Factory.build(
+      'post',
+      {
+        id: 'p2',
+        title: 'Disabled post',
+        content: 'This is an offensive post content',
+        contentExcerpt: 'This is an offensive post content',
+        deleted: false,
+      },
+      {
+        image: Factory.build('image', {
+          url: '/some/offensive/image.jpg',
+        }),
+        author: troll,
+        categoryIds,
+      },
+    ),
+    Factory.build(
+      'comment',
+      {
+        id: 'c1',
+        content: 'Disabled comment',
+        contentExcerpt: 'Disabled comment',
+      },
+      {
+        author: troll,
+        postId: 'p3',
+      },
+    ),
   ])
 
   const { server } = createServer({
@@ -105,9 +143,9 @@ beforeAll(async () => {
   const trollingComment = resources[2]
 
   const reports = await Promise.all([
-    factory.create('Report'),
-    factory.create('Report'),
-    factory.create('Report'),
+    Factory.build('report'),
+    Factory.build('report'),
+    Factory.build('report'),
   ])
   const reportAgainstTroll = reports[0]
   const reportAgainstTrollingPost = reports[1]
@@ -154,7 +192,7 @@ beforeAll(async () => {
 })
 
 afterAll(async () => {
-  await factory.cleanDatabase()
+  await cleanDatabase()
 })
 
 describe('softDeleteMiddleware', () => {
@@ -184,7 +222,9 @@ describe('softDeleteMiddleware', () => {
               name
               slug
               about
-              avatar
+              avatar {
+                url
+              }
             }
           }
         }
@@ -200,7 +240,9 @@ describe('softDeleteMiddleware', () => {
               contributions {
                 title
                 slug
-                image
+                image {
+                  url
+                }
                 content
                 contentExcerpt
               }
@@ -224,7 +266,10 @@ describe('softDeleteMiddleware', () => {
         it('displays slug', () => expect(subject.slug).toEqual('offensive-name'))
         it('displays about', () =>
           expect(subject.about).toEqual('This self description is very offensive'))
-        it('displays avatar', () => expect(subject.avatar).toEqual('/some/offensive/avatar.jpg'))
+        it('displays avatar', () =>
+          expect(subject.avatar).toEqual({
+            url: expect.stringContaining('/some/offensive/avatar.jpg'),
+          }))
       })
 
       describe('Post', () => {
@@ -236,7 +281,10 @@ describe('softDeleteMiddleware', () => {
           expect(subject.content).toEqual('This is an offensive post content'))
         it('displays contentExcerpt', () =>
           expect(subject.contentExcerpt).toEqual('This is an offensive post content'))
-        it('displays image', () => expect(subject.image).toEqual('/some/offensive/image.jpg'))
+        it('displays image', () =>
+          expect(subject.image).toEqual({
+            url: expect.stringContaining('/some/offensive/image.jpg'),
+          }))
       })
 
       describe('Comment', () => {
@@ -259,7 +307,7 @@ describe('softDeleteMiddleware', () => {
         it('obfuscates name', () => expect(subject.name).toEqual('UNAVAILABLE'))
         it('obfuscates slug', () => expect(subject.slug).toEqual('UNAVAILABLE'))
         it('obfuscates about', () => expect(subject.about).toEqual('UNAVAILABLE'))
-        it('obfuscates avatar', () => expect(subject.avatar).toEqual('UNAVAILABLE'))
+        it('obfuscates avatar', () => expect(subject.avatar).toEqual(null))
       })
 
       describe('Post', () => {

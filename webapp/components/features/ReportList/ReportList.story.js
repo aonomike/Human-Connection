@@ -1,7 +1,7 @@
 import { storiesOf } from '@storybook/vue'
 import { withA11y } from '@storybook/addon-a11y'
 import { action } from '@storybook/addon-actions'
-import { post } from '~/components/PostCard/PostCard.story.js'
+import { post } from '~/components/PostTeaser/PostTeaser.story.js'
 import { user } from '~/components/UserTeaser/UserTeaser.story.js'
 import helpers from '~/storybook/helpers'
 import ReportList from './ReportList'
@@ -158,9 +158,9 @@ export const reports = [
     ],
   },
 ]
-const unreviewedReports = reports.filter(report => !report.reviewed)
-const reviewedReports = reports.filter(report => report.reviewed)
-const closedReports = reports.filter(report => report.closed)
+const unreviewedReports = reports.filter((report) => !report.reviewed)
+const reviewedReports = reports.filter((report) => report.reviewed)
+const closedReports = reports.filter((report) => report.closed)
 const filterOptions = [
   { label: 'All', value: reports },
   { label: 'Unreviewed', value: unreviewedReports },
@@ -183,11 +183,11 @@ storiesOf('ReportList', module)
       openModal: action('openModal'),
       filter: action('filter'),
     },
-    template: `<ds-card>
+    template: `<base-card>
                 <div class="reports-header">
                   <h3 class="title">Reports</h3>
                   <dropdown-filter @filter="filter" :filterOptions="filterOptions" :selected="selected" />
                 </div>
                 <reports-table :reports="reports" @confirm="openModal" />
-              </ds-card>`,
+              </base-card>`,
   }))

@@ -1,48 +1,46 @@
 import { mount } from '@vue/test-utils'
+import Vuex from 'vuex'
 import FilterMenu from './FilterMenu.vue'
 
 const localVue = global.localVue
+let wrapper
 
 describe('FilterMenu.vue', () => {
-  let wrapper
-  let mocks
-  let propsData
+  const mocks = {
+    $t: jest.fn((string) => string),
+  }
+
+  const getters = {
+    'posts/isActive': () => false,
+  }
+
+  const stubs = {
+    FollowingFilter: true,
+    CategoriesFilter: true,
+    EmotionsFilter: true,
+    LanguagesFilter: true,
+  }
+
+  const Wrapper = () => {
+    const store = new Vuex.Store({ getters })
+    return mount(FilterMenu, { mocks, localVue, store, stubs })
+  }
 
   beforeEach(() => {
-    mocks = { $t: () => {} }
+    wrapper = Wrapper()
   })
 
-  describe('given a user', () => {
-    beforeEach(() => {
-      propsData = {
-        hashtag: null,
-      }
+  describe('mount', () => {
+    it('starts with dropdown button inactive', () => {
+      const dropdownButton = wrapper.find('.filter-menu .base-button')
+      expect(dropdownButton.attributes().class).toContain('--ghost')
     })
 
-    describe('mount', () => {
-      const Wrapper = () => {
-        return mount(FilterMenu, { mocks, localVue, propsData })
-      }
-      beforeEach(() => {
-        wrapper = Wrapper()
-      })
-
-      it('does not render a card if there are no hashtags', () => {
-        expect(wrapper.is('.ds-card')).toBe(true)
-      })
-
-      it('renders a card if there are hashtags', () => {
-        propsData.hashtag = 'Frieden'
-        wrapper = Wrapper()
-        expect(wrapper.is('.ds-card')).toBe(true)
-      })
-
-      describe('click "clear-search-button" button', () => {
-        it('emits clearSearch', () => {
-          wrapper.find('[name="clear-search-button"]').trigger('click')
-          expect(wrapper.emitted().clearSearch).toHaveLength(1)
-        })
-      })
+    it('sets dropdwon button attribute `filled` when a filter is applied', () => {
+      getters['posts/isActive'] = jest.fn(() => true)
+      wrapper = Wrapper()
+      const dropdownButton = wrapper.find('.filter-menu .base-button')
+      expect(dropdownButton.attributes().class).toContain('--filled')
     })
   })
 })

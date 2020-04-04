@@ -1,9 +1,11 @@
-import { mount } from '@vue/test-utils'
+import { config, mount } from '@vue/test-utils'
 
 import LocaleSwitch from './LocaleSwitch.vue'
 import Vuex from 'vuex'
 
 const localVue = global.localVue
+
+config.stubs['client-only'] = '<span><slot /></span>'
 
 describe('LocaleSwitch.vue', () => {
   let wrapper, mocks, computed, deutschLanguageItem, getters
@@ -12,12 +14,12 @@ describe('LocaleSwitch.vue', () => {
     mocks = {
       $i18n: {
         locale: () => 'en',
-        set: jest.fn(locale => locale),
+        set: jest.fn((locale) => locale),
       },
       $t: jest.fn(),
       $toast: {
-        success: jest.fn(a => a),
-        error: jest.fn(a => a),
+        success: jest.fn((a) => a),
+        error: jest.fn((a) => a),
       },
       setPlaceholderText: jest.fn(),
       $apollo: {

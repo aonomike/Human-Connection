@@ -1,23 +1,13 @@
 import log from './helpers/databaseLogger'
 
-const transformReturnType = record => {
-  return {
-    ...record.get('report').properties,
-    resource: {
-      __typename: record.get('type'),
-      ...record.get('resource').properties,
-    },
-  }
-}
-
 export default {
   Mutation: {
     fileReport: async (_parent, params, context, _resolveInfo) => {
       const { resourceId, reasonCategory, reasonDescription } = params
       const { driver, user } = context
       const session = driver.session()
-      const reportWriteTxResultPromise = session.writeTransaction(async transaction => {
-        const reportTransactionResponse = await transaction.run(
+      const fileReportWriteTxResultPromise = session.writeTransaction(async (transaction) => {
+        const fileReportTransactionResponse = await transaction.run(
           `
             MATCH (submitter:User {id: $submitterId})
             MATCH (resource {id: $resourceId})
@@ -27,7 +17,8 @@ export default {
             WITH submitter, resource, report
             CREATE (report)<-[filed:FILED {createdAt: $createdAt, reasonCategory: $reasonCategory, reasonDescription: $reasonDescription}]-(submitter)
 
-            RETURN report, resource, labels(resource)[0] AS type
+            WITH filed, report, resource {.*, __typename: labels(resource)[0]} AS finalResource
+            RETURN filed {.*, reportId: report.id, resource: properties(finalResource)} AS filedReport
           `,
           {
             resourceId,
@@ -37,13 +28,12 @@ export default {
             reasonDescription,
           },
         )
-        log(reportTransactionResponse)
-        return reportTransactionResponse.records.map(transformReturnType)
+        log(fileReportTransactionResponse)
+        return fileReportTransactionResponse.records.map((record) => record.get('filedReport'))
       })
       try {
-        const [createdRelationshipWithNestedAttributes] = await reportWriteTxResultPromise
-        if (!createdRelationshipWithNestedAttributes) return null
-        return createdRelationshipWithNestedAttributes
+        const [filedReport] = await fileReportWriteTxResultPromise
+        return filedReport || null
       } finally {
         session.close()
       }
@@ -76,14 +66,24 @@ export default {
           filterClause = ''
       }
 
-      if (params.closed) filterClause = 'AND report.closed = true'
+      switch (params.closed) {
+        case true:
+          filterClause = 'AND report.closed = true'
+          break
+        case false:
+          filterClause = 'AND report.closed = false'
+          break
+        default:
+          break
+      }
 
       const offset =
         params.offset && typeof params.offset === 'number' ? `SKIP ${params.offset}` : ''
       const limit = params.first && typeof params.first === 'number' ? `LIMIT ${params.first}` : ''
 
-      const reportReadTxPromise = session.readTransaction(async transaction => {
-        const allReportsTransactionResponse = await transaction.run(
+      const reportsReadTxPromise = session.readTransaction(async (transaction) => {
+        const reportsTransactionResponse = await transaction.run(
+          // !!! this Cypher query returns multiple reports on the same resource! i will create an issue for refactoring (bug fixing)
           `
             MATCH (report:Report)-[:BELONGS_TO]->(resource)
             WHERE (resource:User OR resource:Post OR resource:Comment)
@@ -101,11 +101,11 @@ export default {
             ${offset} ${limit}
           `,
         )
-        log(allReportsTransactionResponse)
-        return allReportsTransactionResponse.records.map(record => record.get('report'))
+        log(reportsTransactionResponse)
+        return reportsTransactionResponse.records.map((record) => record.get('report'))
       })
       try {
-        const reports = await reportReadTxPromise
+        const reports = await reportsReadTxPromise
         return reports
       } finally {
         session.close()
@@ -118,7 +118,7 @@ export default {
       const session = context.driver.session()
       const { id } = parent
       let filed
-      const readTxPromise = session.readTransaction(async transaction => {
+      const readTxPromise = session.readTransaction(async (transaction) => {
         const filedReportsTransactionResponse = await transaction.run(
           `
             MATCH (submitter:User)-[filed:FILED]->(report:Report {id: $id})
@@ -127,14 +127,14 @@ export default {
           { id },
         )
         log(filedReportsTransactionResponse)
-        return filedReportsTransactionResponse.records.map(record => ({
+        return filedReportsTransactionResponse.records.map((record) => ({
           submitter: record.get('submitter').properties,
           filed: record.get('filed').properties,
         }))
       })
       try {
         const filedReports = await readTxPromise
-        filed = filedReports.map(reportedRecord => {
+        filed = filedReports.map((reportedRecord) => {
           const { submitter, filed } = reportedRecord
           const relationshipWithNestedAttributes = {
             ...filed,
@@ -152,7 +152,7 @@ export default {
       const session = context.driver.session()
       const { id } = parent
       let reviewed
-      const readTxPromise = session.readTransaction(async transaction => {
+      const readTxPromise = session.readTransaction(async (transaction) => {
         const reviewedReportsTransactionResponse = await transaction.run(
           `
             MATCH (resource)<-[:BELONGS_TO]-(report:Report {id: $id})<-[review:REVIEWED]-(moderator:User)
@@ -162,14 +162,14 @@ export default {
           { id },
         )
         log(reviewedReportsTransactionResponse)
-        return reviewedReportsTransactionResponse.records.map(record => ({
+        return reviewedReportsTransactionResponse.records.map((record) => ({
           review: record.get('review').properties,
           moderator: record.get('moderator').properties,
         }))
       })
       try {
         const reviewedReports = await readTxPromise
-        reviewed = reviewedReports.map(reportedRecord => {
+        reviewed = reviewedReports.map((reportedRecord) => {
           const { review, moderator } = reportedRecord
           const relationshipWithNestedAttributes = {
             ...review,

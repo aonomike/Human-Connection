@@ -6,7 +6,7 @@ import Vuex from 'vuex'
 import PostMutations from '~/graphql/PostMutations.js'
 import CategoriesSelect from '~/components/CategoriesSelect/CategoriesSelect'
 
-import TeaserImage from '~/components/TeaserImage/TeaserImage'
+import ImageUploader from '~/components/ImageUploader/ImageUploader'
 import MutationObserver from 'mutation-observer'
 
 global.MutationObserver = MutationObserver
@@ -70,7 +70,7 @@ describe('ContributionForm.vue', () => {
     },
     url: 'someUrlToImage',
   }
-  const image = '/uploads/1562010976466-avataaars'
+  const image = { sensitive: false, url: '/uploads/1562010976466-avataaars', aspectRatio: 1 }
   beforeEach(() => {
     mocks = {
       $t: jest.fn(),
@@ -140,7 +140,9 @@ describe('ContributionForm.vue', () => {
           postTitleInput = wrapper.find('.ds-input')
           postTitleInput.setValue(postTitle)
           await wrapper.vm.updateEditorContent(postContent)
-          englishLanguage = wrapper.findAll('li').filter(language => language.text() === 'English')
+          englishLanguage = wrapper
+            .findAll('li')
+            .filter((language) => language.text() === 'English')
           englishLanguage.trigger('click')
           dataPrivacyButton = await wrapper
             .find(CategoriesSelect)
@@ -182,7 +184,7 @@ describe('ContributionForm.vue', () => {
         })
 
         it('has no more than three categories', async () => {
-          wrapper.vm.form.categoryIds = ['cat4', 'cat9', 'cat15', 'cat27']
+          wrapper.vm.formData.categoryIds = ['cat4', 'cat9', 'cat15', 'cat27']
           await Vue.nextTick()
           wrapper.find('form').trigger('submit')
           expect(mocks.$apollo.mutate).not.toHaveBeenCalled()
@@ -199,17 +201,16 @@ describe('ContributionForm.vue', () => {
               language: 'en',
               id: null,
               categoryIds: ['cat12'],
-              imageUpload: null,
-              imageAspectRatio: null,
               image: null,
-              imageBlurred: false,
             },
           }
           postTitleInput = wrapper.find('.ds-input')
           postTitleInput.setValue(postTitle)
           await wrapper.vm.updateEditorContent(postContent)
           wrapper.find(CategoriesSelect).setData({ categories })
-          englishLanguage = wrapper.findAll('li').filter(language => language.text() === 'English')
+          englishLanguage = wrapper
+            .findAll('li')
+            .filter((language) => language.text() === 'English')
           englishLanguage.trigger('click')
           await Vue.nextTick()
           dataPrivacyButton = await wrapper
@@ -226,17 +227,30 @@ describe('ContributionForm.vue', () => {
 
         it('supports changing the language', async () => {
           expectedParams.variables.language = 'de'
-          deutschLanguage = wrapper.findAll('li').filter(language => language.text() === 'Deutsch')
+          deutschLanguage = wrapper
+            .findAll('li')
+            .filter((language) => language.text() === 'Deutsch')
           deutschLanguage.trigger('click')
           wrapper.find('form').trigger('submit')
           expect(mocks.$apollo.mutate).toHaveBeenCalledWith(expect.objectContaining(expectedParams))
         })
 
         it('supports adding a teaser image', async () => {
-          expectedParams.variables.imageUpload = imageUpload
-          wrapper.find(TeaserImage).vm.$emit('addTeaserImage', imageUpload)
+          expectedParams.variables.image = {
+            aspectRatio: null,
+            sensitive: false,
+            upload: imageUpload,
+          }
+          const spy = jest
+            .spyOn(FileReader.prototype, 'readAsDataURL')
+            .mockImplementation(function () {
+              this.onload({ target: { result: 'someUrlToImage' } })
+            })
+          wrapper.find(ImageUploader).vm.$emit('addHeroImage', imageUpload)
           await wrapper.find('form').trigger('submit')
           expect(mocks.$apollo.mutate).toHaveBeenCalledWith(expect.objectContaining(expectedParams))
+          expect(spy).toHaveBeenCalledWith(imageUpload)
+          spy.mockReset()
         })
 
         it('content is valid with just a link', async () => {
@@ -280,7 +294,9 @@ describe('ContributionForm.vue', () => {
           await wrapper.vm.updateEditorContent(postContent)
           categoryIds = ['cat12']
           wrapper.find(CategoriesSelect).setData({ categories })
-          englishLanguage = wrapper.findAll('li').filter(language => language.text() === 'English')
+          englishLanguage = wrapper
+            .findAll('li')
+            .filter((language) => language.text() === 'English')
           englishLanguage.trigger('click')
           await Vue.nextTick()
           dataPrivacyButton = await wrapper
@@ -314,26 +330,17 @@ describe('ContributionForm.vue', () => {
                 name: 'Democracy & Politics',
               },
             ],
-            imageAspectRatio: 1,
           },
         }
         wrapper = Wrapper()
       })
 
-      it('sets id equal to contribution id', () => {
-        expect(wrapper.vm.id).toEqual(propsData.contribution.id)
-      })
-
-      it('sets slug equal to contribution slug', () => {
-        expect(wrapper.vm.slug).toEqual(propsData.contribution.slug)
-      })
-
       it('sets title equal to contribution title', () => {
-        expect(wrapper.vm.form.title).toEqual(propsData.contribution.title)
+        expect(wrapper.vm.formData.title).toEqual(propsData.contribution.title)
       })
 
       it('sets content equal to contribution content', () => {
-        expect(wrapper.vm.form.content).toEqual(propsData.contribution.content)
+        expect(wrapper.vm.formData.content).toEqual(propsData.contribution.content)
       })
 
       describe('valid update', () => {
@@ -359,9 +366,9 @@ describe('ContributionForm.vue', () => {
               language: propsData.contribution.language,
               id: propsData.contribution.id,
               categoryIds: ['cat12'],
-              image,
-              imageUpload: null,
-              imageAspectRatio: 1,
+              image: {
+                sensitive: false,
+              },
             },
           }
         })
@@ -381,6 +388,15 @@ describe('ContributionForm.vue', () => {
             .find(CategoriesSelect)
             .find('[data-test="category-buttons-cat3"]')
           healthWellbeingButton.trigger('click')
+          await wrapper.find('form').trigger('submit')
+          expect(mocks.$apollo.mutate).toHaveBeenCalledWith(expect.objectContaining(expectedParams))
+        })
+
+        it('supports deleting a teaser image', async () => {
+          expectedParams.variables.image = null
+          propsData.contribution.image = { url: '/uploads/someimage.png' }
+          wrapper = Wrapper()
+          wrapper.find('[data-test="delete-button"]').trigger('click')
           await wrapper.find('form').trigger('submit')
           expect(mocks.$apollo.mutate).toHaveBeenCalledWith(expect.objectContaining(expectedParams))
         })

@@ -1,11 +1,10 @@
-import Factory from '../factories'
+import { cleanDatabase } from '../db/factories'
 import { getNeode } from '../db/neo4j'
 
-const factory = Factory()
 const neode = getNeode()
 
 afterEach(async () => {
-  await factory.cleanDatabase()
+  await cleanDatabase()
 })
 
 describe('role', () => {
@@ -29,7 +28,7 @@ describe('slug', () => {
     )
   })
 
-  it('must be unique', async done => {
+  it('must be unique', async (done) => {
     await neode.create('User', { slug: 'Matt' })
     try {
       await expect(neode.create('User', { slug: 'Matt' })).rejects.toThrow('already exists')
@@ -47,14 +46,14 @@ describe('slug', () => {
         \`\`\`
 
         Learn how to setup the database here:
-        https://docs.human-connection.org/human-connection/neo4j
+        https://docs.human-connection.org/human-connection/backend#database-indices-and-constraints
       `)
     }
   })
 
   describe('characters', () => {
-    const createUser = attrs => {
-      return neode.create('User', attrs).then(user => user.toJson())
+    const createUser = (attrs) => {
+      return neode.create('User', attrs).then((user) => user.toJson())
     }
 
     it('-', async () => {

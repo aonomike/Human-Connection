@@ -1,7 +1,8 @@
 <template>
   <ds-form v-model="form" :schema="formSchema" @submit="submit">
-    <template slot-scope="{ errors }">
-      <ds-card :header="$t('settings.data.name')">
+    <template #default="{ errors }">
+      <base-card>
+        <h2 class="title">{{ $t('settings.data.name') }}</h2>
         <ds-input
           id="name"
           model="name"
@@ -30,12 +31,10 @@
           :label="$t('settings.data.labelBio')"
           :placeholder="$t('settings.data.labelBio')"
         />
-        <template slot="footer">
-          <base-button icon="check" :disabled="errors" type="submit" :loading="loadingData" filled>
-            {{ $t('actions.save') }}
-          </base-button>
-        </template>
-      </ds-card>
+        <base-button icon="check" :disabled="errors" type="submit" :loading="loadingData" filled>
+          {{ $t('actions.save') }}
+        </base-button>
+      </base-card>
     </template>
   </ds-form>
 </template>
@@ -74,11 +73,11 @@ export default {
       }
     },
     form: {
-      get: function() {
+      get: function () {
         const { name, slug, locationName, about } = this.currentUser
         return { name, slug, locationName, about }
       },
-      set: function(formData) {
+      set: function (formData) {
         this.formData = formData
       },
     },
@@ -129,7 +128,7 @@ export default {
         return []
       }
       const output = []
-      res.data.features.forEach(item => {
+      res.data.features.forEach((item) => {
         output.push({
           label: item.place_name,
           value: item.place_name,
@@ -163,7 +162,7 @@ export default {
             cancelToken: this.axiosSource.token,
           },
         )
-        .then(res => {
+        .then((res) => {
           this.cities = this.processCityResults(res)
         })
         .finally(() => {

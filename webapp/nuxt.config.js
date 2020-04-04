@@ -4,7 +4,13 @@ import dotenv from 'dotenv'
 dotenv.config() // we want to synchronize @nuxt-dotenv and nuxt-env
 
 const pkg = require('./package')
-export const envWhitelist = ['NODE_ENV', 'MAPBOX_TOKEN', 'PUBLIC_REGISTRATION']
+export const envWhitelist = [
+  'NODE_ENV',
+  'MAPBOX_TOKEN',
+  'PUBLIC_REGISTRATION',
+  'WEBSOCKETS_URI',
+  'GRAPHQL_URI',
+]
 const dev = process.env.NODE_ENV !== 'production'
 
 const styleguidePath = '../styleguide'
@@ -255,7 +261,7 @@ export default {
         })
       }
 
-      const svgRule = config.module.rules.find(rule => rule.test.test('.svg'))
+      const svgRule = config.module.rules.find((rule) => rule.test.test('.svg'))
       svgRule.test = /\.(png|jpe?g|gif|webp)$/
       config.module.rules.push({
         test: /\.svg$/,
@@ -285,10 +291,10 @@ export default {
             preTransformNode(abstractSyntaxTreeElement) {
               if (!ctx.isDev) {
                 const { attrsMap, attrsList } = abstractSyntaxTreeElement
-                tagAttributesForTesting.forEach(attribute => {
+                tagAttributesForTesting.forEach((attribute) => {
                   if (attrsMap[attribute]) {
                     delete attrsMap[attribute]
-                    const index = attrsList.findIndex(attr => attr.name === attribute)
+                    const index = attrsList.findIndex((attr) => attr.name === attribute)
                     attrsList.splice(index, 1)
                   }
                 })

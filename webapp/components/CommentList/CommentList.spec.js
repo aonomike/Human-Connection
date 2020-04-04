@@ -1,12 +1,12 @@
 import { config, mount } from '@vue/test-utils'
 import CommentList from './CommentList'
-import Comment from '~/components/Comment/Comment'
+import CommentCard from '~/components/CommentCard/CommentCard'
 import Vuex from 'vuex'
 import Vue from 'vue'
 
 const localVue = global.localVue
 
-localVue.filter('truncate', string => string)
+localVue.filter('truncate', (string) => string)
 localVue.directive('scrollTo', jest.fn())
 
 config.stubs['v-popover'] = '<span><slot /></span>'
@@ -20,9 +20,14 @@ describe('CommentList.vue', () => {
     beforeEach(() => {
       propsData = {
         post: {
-          id: 1,
+          id: 'post42',
           comments: [
-            { id: 'comment134', contentExcerpt: 'this is a comment', content: 'this is a comment' },
+            {
+              id: 'comment134',
+              contentExcerpt: 'this is a comment',
+              content: 'this is a comment',
+              author: { id: 'some-user' },
+            },
           ],
         },
       }
@@ -37,10 +42,11 @@ describe('CommentList.vue', () => {
       mocks = {
         $t: jest.fn(),
         $filters: {
-          truncate: a => a,
-          removeHtml: a => a,
+          truncate: (a) => a,
+          removeHtml: (a) => a,
         },
         $scrollTo: jest.fn(),
+        $route: { hash: '' },
         $apollo: {
           queries: {
             Post: {
@@ -73,12 +79,6 @@ describe('CommentList.vue', () => {
       beforeEach(jest.useFakeTimers)
 
       describe('$route.hash !== `#comments`', () => {
-        beforeEach(() => {
-          mocks.$route = {
-            hash: '',
-          }
-        })
-
         it('skips $scrollTo', () => {
           wrapper = Wrapper()
           jest.runAllTimers()
@@ -107,7 +107,7 @@ describe('CommentList.vue', () => {
       })
 
       it('Comment emitted reply()', () => {
-        wrapper.find(Comment).vm.$emit('reply', {
+        wrapper.find(CommentCard).vm.$emit('reply', {
           id: 'commentAuthorId',
           slug: 'ogerly',
         })

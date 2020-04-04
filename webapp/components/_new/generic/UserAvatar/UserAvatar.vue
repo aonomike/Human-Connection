@@ -18,7 +18,7 @@ export default {
     size: {
       type: String,
       required: false,
-      validator: value => {
+      validator: (value) => {
         return value.match(/(small|large)/)
       },
     },
@@ -34,11 +34,7 @@ export default {
     userInitials() {
       if (this.isAnonymous) return ''
 
-      return this.user.name
-        .match(/\b\w/g)
-        .join('')
-        .substring(0, 3)
-        .toUpperCase()
+      return this.user.name.match(/\b\w/g).join('').substring(0, 3).toUpperCase()
     },
   },
 }
@@ -76,6 +72,7 @@ export default {
   > .image {
     position: relative;
     width: 100%;
+    height: 100%;
     object-fit: cover;
     object-position: center;
   }

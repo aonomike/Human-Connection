@@ -47,7 +47,7 @@ const isAuthor = rule({
   if (!user) return false
   const { id: resourceId } = args
   const session = driver.session()
-  const authorReadTxPromise = session.readTransaction(async transaction => {
+  const authorReadTxPromise = session.readTransaction(async (transaction) => {
     const authorTransactionResponse = await transaction.run(
       `
         MATCH (resource {id: $resourceId})<-[:WROTE]-(author {id: $userId})
@@ -55,7 +55,7 @@ const isAuthor = rule({
       `,
       { resourceId, userId: user.id },
     )
-    return authorTransactionResponse.records.map(record => record.get('author'))
+    return authorTransactionResponse.records.map((record) => record.get('author'))
   })
   try {
     const [author] = await authorReadTxPromise
@@ -133,7 +133,7 @@ export default shield(
       CreateComment: isAuthenticated,
       UpdateComment: isAuthor,
       DeleteComment: isAuthor,
-      DeleteUser: isDeletingOwnAccount,
+      DeleteUser: or(isDeletingOwnAccount, isAdmin),
       requestPasswordReset: allow,
       resetPassword: allow,
       AddPostEmotions: isAuthenticated,
@@ -152,6 +152,7 @@ export default shield(
     User: {
       email: or(isMyOwn, isAdmin),
     },
+    Report: isModerator,
   },
   {
     debug,
